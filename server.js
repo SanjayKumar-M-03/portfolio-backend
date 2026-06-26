@@ -8,6 +8,7 @@ const networkApplicationServerInstance = express();
 const portAllocationIndex = process.env.PORT || 5000;
 const productionCorsWhitelistOrigin = process.env.ALLOWED_ORIGIN || '*';
 
+// 1. Standard CORS Configuration Layer
 networkApplicationServerInstance.use(cors({
   origin: function (incomingRequestOrigin, serverCallbackRoutine) {
     if (!incomingRequestOrigin || productionCorsWhitelistOrigin === '*' || incomingRequestOrigin === productionCorsWhitelistOrigin || incomingRequestOrigin.includes('localhost') || incomingRequestOrigin.includes('127.0.0.1')) {
@@ -20,6 +21,11 @@ networkApplicationServerInstance.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true
 }));
+
+// 2. CRITICAL: Explicitly Handle Preflight OPTIONS Requests Globally
+networkApplicationServerInstance.options('*', (req, res) => {
+  res.status(204).end();
+});
 
 networkApplicationServerInstance.use(express.json());
 
@@ -50,14 +56,6 @@ networkApplicationServerInstance.use((errorContext, req, res, next) => {
     success: false,
     message: errorContext.message || 'An unhandled structural exception occurred inside the active API loop.'
   });
-});
-
-networkApplicationServerInstance.use((err, req, res, next) => {
-  if (err) {
-    res.status(400).json({ success: false, message: 'Invalid transactional system runtime execution payload structure.' });
-  } else {
-    next();
-  }
 });
 
 networkApplicationServerInstance.listen(portAllocationIndex, () => {
