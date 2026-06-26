@@ -1,0 +1,6 @@
+# PORT=5000
+# MONGO_URI=mongodb+srv://sanjayadmin:StrongPassword123@clustersk.sddvcfg.mongodb.net/portfolio?retryWrites=true&w=majority&appName=ClusterSK
+# ALLOWED_ORIGIN=https://YOUR_GITHUB_USERNAME.github.io
+PORT=5000
+MONGO_URI=mongodb+srv://sanjayadmin:StrongPassword123@clustersk.sddvcfg.mongodb.net/portfolio?retryWrites=true&w=majority&appName=ClusterSK
+ALLOWED_ORIGIN=http://127.0.0.1:5500
