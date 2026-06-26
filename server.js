@@ -8,7 +8,7 @@ const networkApplicationServerInstance = express();
 const portAllocationIndex = process.env.PORT || 5000;
 const productionCorsWhitelistOrigin = process.env.ALLOWED_ORIGIN || '*';
 
-// 1. Standard CORS Configuration Layer
+// 1. Production CORS Framework Configuration
 networkApplicationServerInstance.use(cors({
   origin: function (incomingRequestOrigin, serverCallbackRoutine) {
     if (!incomingRequestOrigin || productionCorsWhitelistOrigin === '*' || incomingRequestOrigin === productionCorsWhitelistOrigin || incomingRequestOrigin.includes('localhost') || incomingRequestOrigin.includes('127.0.0.1')) {
@@ -22,33 +22,50 @@ networkApplicationServerInstance.use(cors({
   credentials: true
 }));
 
-// 2. Explicitly Handle Preflight OPTIONS Requests Globally
+// 2. Global Preflight OPTIONS Routing Interceptor
 networkApplicationServerInstance.options('*', (req, res) => {
   res.status(204).end();
 });
 
 networkApplicationServerInstance.use(express.json());
 
-// 3. Connect to MongoDB Atlas
 const activeDatabaseClusterConnectionString = process.env.MONGO_URI;
 
-if (!activeDatabaseClusterConnectionString) {
-  process.exit(1);
-}
+// 3. Serverless-Hardened Connection Gateway Function
+const connectToDatabaseSafely = async () => {
+  // If connection is already open (state 1), reuse it immediately
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+  
+  // If connecting (state 2) or disconnecting (state 3), wait a moment
+  if (mongoose.connection.readyState === 2) {
+    return new Promise((resolve) => {
+      const checkStateInterval = setInterval(() => {
+        if (mongoose.connection.readyState === 1) {
+          clearInterval(checkStateInterval);
+          resolve();
+        }
+      }, 100);
+    });
+  }
 
-mongoose.connect(activeDatabaseClusterConnectionString, {
-  autoIndex: true
-})
-.then(() => {
-  console.log('MongoDB Atlas node pool validation handshake established successfully.');
-})
-.catch((initializationFailureException) => {
-  console.error(`Database network tier fatal initialization loop error status: ${initializationFailureException}`);
-});
+  if (!activeDatabaseClusterConnectionString) {
+    throw new Error('Database cluster connection string undefined inside system variables.');
+  }
 
-// 4. Unified Direct Endpoints (Handles both options to completely prevent redirects)
+  // Otherwise, establish a clean connection and await its completion
+  await mongoose.connect(activeDatabaseClusterConnectionString, {
+    bufferCommands: false // Disable buffering to expose hidden connection faults instantly
+  });
+};
+
+// 4. Core API Contact Submission Target Gateway
 const contactSubmissionHandler = async (req, res) => {
   try {
+    // Force the serverless container to connect to MongoDB before writing data
+    await connectToDatabaseSafely();
+
     const { name, email, phone, message } = req.body;
 
     if (!name || !email || !phone || !message) {
@@ -67,6 +84,8 @@ const contactSubmissionHandler = async (req, res) => {
     });
 
   } catch (runtimeException) {
+    console.error('Database Operation Trace Error:', runtimeException);
+
     if (runtimeException.name === 'ValidationError') {
       const generatedExceptionResponse = Object.values(runtimeException.errors).map(errorItem => errorItem.message).join(' ');
       return res.status(400).json({
@@ -74,9 +93,11 @@ const contactSubmissionHandler = async (req, res) => {
         message: `Validation boundary mutation failure: ${generatedExceptionResponse}`
       });
     }
+
+    // Returns structural clarity back to the frontend trace logs
     return res.status(500).json({
       success: false,
-      message: 'Critical error encountered inside the database tier connection system.'
+      message: `Database Connection Fault: ${runtimeException.message || 'Operation timed out.'}`
     });
   }
 };
@@ -84,7 +105,7 @@ const contactSubmissionHandler = async (req, res) => {
 networkApplicationServerInstance.post('/api/contact', contactSubmissionHandler);
 networkApplicationServerInstance.post('/api/contact/', contactSubmissionHandler);
 
-// 5. Catch-All Unmapped Routes
+// 5. Unmapped Resource Handler
 networkApplicationServerInstance.use((req, res) => {
   res.status(404).json({ success: false, message: 'Resource routing configuration target unknown.' });
 });
