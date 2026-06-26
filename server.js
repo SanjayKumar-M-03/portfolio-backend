@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const contactApiRouteModule = require('./routes/contact');
+const Contact = require('./models/Contact');
 
 const networkApplicationServerInstance = express();
 const portAllocationIndex = process.env.PORT || 5000;
@@ -22,13 +22,14 @@ networkApplicationServerInstance.use(cors({
   credentials: true
 }));
 
-// 2. CRITICAL: Explicitly Handle Preflight OPTIONS Requests Globally
+// 2. Explicitly Handle Preflight OPTIONS Requests Globally
 networkApplicationServerInstance.options('*', (req, res) => {
   res.status(204).end();
 });
 
 networkApplicationServerInstance.use(express.json());
 
+// 3. Connect to MongoDB Atlas
 const activeDatabaseClusterConnectionString = process.env.MONGO_URI;
 
 if (!activeDatabaseClusterConnectionString) {
@@ -45,17 +46,47 @@ mongoose.connect(activeDatabaseClusterConnectionString, {
   console.error(`Database network tier fatal initialization loop error status: ${initializationFailureException}`);
 });
 
-networkApplicationServerInstance.use('/api/contact', contactApiRouteModule);
+// 4. Unified Direct Endpoints (Handles both options to completely prevent redirects)
+const contactSubmissionHandler = async (req, res) => {
+  try {
+    const { name, email, phone, message } = req.body;
 
+    if (!name || !email || !phone || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Object serialization transaction failure: Missing data elements.'
+      });
+    }
+
+    const automatedContactInstance = new Contact({ name, email, phone, message });
+    await automatedContactInstance.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Contact request submitted successfully'
+    });
+
+  } catch (runtimeException) {
+    if (runtimeException.name === 'ValidationError') {
+      const generatedExceptionResponse = Object.values(runtimeException.errors).map(errorItem => errorItem.message).join(' ');
+      return res.status(400).json({
+        success: false,
+        message: `Validation boundary mutation failure: ${generatedExceptionResponse}`
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Critical error encountered inside the database tier connection system.'
+    });
+  }
+};
+
+networkApplicationServerInstance.post('/api/contact', contactSubmissionHandler);
+networkApplicationServerInstance.post('/api/contact/', contactSubmissionHandler);
+
+// 5. Catch-All Unmapped Routes
 networkApplicationServerInstance.use((req, res) => {
   res.status(404).json({ success: false, message: 'Resource routing configuration target unknown.' });
-});
-
-networkApplicationServerInstance.use((errorContext, req, res, next) => {
-  res.status(500).json({
-    success: false,
-    message: errorContext.message || 'An unhandled structural exception occurred inside the active API loop.'
-  });
 });
 
 networkApplicationServerInstance.listen(portAllocationIndex, () => {
